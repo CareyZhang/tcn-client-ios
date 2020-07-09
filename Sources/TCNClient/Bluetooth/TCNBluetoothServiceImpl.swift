@@ -78,7 +78,7 @@ class TCNBluetoothServiceImpl: NSObject {
     
     private var estimatedDistancesForRemoteDeviceIdentifiers = [UUID : Double]()
 
-    private var rssiForRemoteDeviceIdentifiers = [UUID : Double]()
+    private var rssiForRemoteDeviceIdentifiers = [UUID : Int]()
     
     private var peripheralsToReadTCNFrom = Set<CBPeripheral>()
     
