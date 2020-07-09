@@ -20,7 +20,7 @@ public class TCNBluetoothService: NSObject {
     
     public init(
         tcnGenerator: @escaping () -> Data,
-        tcnFinder: @escaping (Data, Double?) -> Void,
+        tcnFinder: @escaping (Data, Double?, UUID?, Int?) -> Void,
         errorHandler: @escaping (Error) -> Void
     ) {
         self.tcnGenerator = tcnGenerator
