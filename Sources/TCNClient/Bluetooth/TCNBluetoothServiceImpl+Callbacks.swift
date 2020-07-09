@@ -7,7 +7,7 @@ import os.log
 
 extension TCNBluetoothServiceImpl {
     
-    func didFindTCN(_ tcn: Data, estimatedDistance: Double? = nil, uuid: UUID? = nil, rssi:Int? = nil) {
+    func didFindTCN(_ tcn: Data, estimatedDistance: Double? = nil, uuid: UUID? = nil, rssi:Double? = nil) {
         if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
             os_log(
                 "Did find TCN=%@ at estimated distance=%.2f",
