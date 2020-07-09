@@ -507,7 +507,7 @@ extension TCNBluetoothServiceImpl: CBCentralManagerDelegate {
                 hintIsAndroid: isAndroid
             )
         )
-        self.rssiForRemoteDeviceIdentifiers[peripheral.identifier] = int(RSSI)
+        self.rssiForRemoteDeviceIdentifiers[peripheral.identifier] = Int(RSSI)
         self.estimatedDistancesForRemoteDeviceIdentifiers[
             peripheral.identifier] = estimatedDistanceMeters
         
