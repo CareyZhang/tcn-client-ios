@@ -45,6 +45,7 @@ class TCNBluetoothServiceImpl: NSObject {
     
     private var connectingTimeoutTimersForPeripheralIdentifiers =
         [UUID : Timer]()
+    private var databaseManager = DBManager()
     
     private var connectingPeripheralIdentifiers = Set<UUID>() {
         didSet {
@@ -496,9 +497,21 @@ extension TCNBluetoothServiceImpl: CBCentralManagerDelegate {
         advertisementData: [String : Any],
         rssi RSSI: NSNumber
     ) {
+//        print("CBAdvertisementDataServiceDataKey: \(advertisementData)")
+//        if (advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID : Data]) == nil{
+//            return
+//        }
         // Only Android can enable advertising data in the service data field.
-        let isAndroid = ((advertisementData[CBAdvertisementDataServiceDataKey]
-            as? [CBUUID : Data])?[.tcnService] != nil)
+//        let muuid_byte = Data(((advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID : Data])?[.tcnService])![16..<20])
+//        let muuid_str = String(data: muuid_byte, encoding: .utf8)!
+//        let phone_type_sign = muuid_str[muuid_str.index(muuid_str.startIndex, offsetBy:0)]
+        var isAndroid = ((advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID : Data])?[.tcnService] != nil)
+//        var isAndroid = false
+//        if phone_type_sign == "A"{
+//            isAndroid = true
+//        }
+//        print("advertisementData:\(advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID : Data])")
+//        print("isandroid: \(isAndroid)")
         
         let estimatedDistanceMeters = getEstimatedDistanceMeters(
             RSSI: RSSI.doubleValue,
@@ -507,7 +520,6 @@ extension TCNBluetoothServiceImpl: CBCentralManagerDelegate {
                 hintIsAndroid: isAndroid
             )
         )
-        print("advertisementData:: \(advertisementData)")
         self.rssiForRemoteDeviceIdentifiers[peripheral.identifier] = RSSI.doubleValue
         self.estimatedDistancesForRemoteDeviceIdentifiers[
             peripheral.identifier] = estimatedDistanceMeters
@@ -541,8 +553,7 @@ extension TCNBluetoothServiceImpl: CBCentralManagerDelegate {
         
         // Did we find a TCN from the peripheral already?
         if let tcn = self.tcnsForRemoteDeviceIdentifiers[peripheral.identifier] {
-            self.didFindTCN(tcn, estimatedDistance: self.estimatedDistancesForRemoteDeviceIdentifiers[peripheral.identifier], uuid: peripheral.identifier, rssi: self.rssiForRemoteDeviceIdentifiers[peripheral.identifier] )
-            print("tcn::\(tcn.base64EncodedString()) ")
+            self.didFindTCN(tcn, estimatedDistance: self.estimatedDistancesForRemoteDeviceIdentifiers[peripheral.identifier], uuid: peripheral.identifier, rssi: self.rssiForRemoteDeviceIdentifiers[peripheral.identifier])
         }
         else {
             let isConnectable = (advertisementData[
@@ -552,13 +563,12 @@ extension TCNBluetoothServiceImpl: CBCentralManagerDelegate {
             if let advertisementDataServiceData = advertisementData[CBAdvertisementDataServiceDataKey]
                 as? [CBUUID : Data],
                 let serviceData = advertisementDataServiceData[.tcnService] {
-                
-                // The service data = bridged TCN + first 4 bytes of the current TCN.
+                // The service data = bridged serviceDataTCN + first 4 bytes of the current TCN.
                 // When the Android bridges a TCN of nearby iOS devices, the
                 // last 4 bytes are different than the first 4 bytes.
-                guard serviceData.count >= 16 else {
-                    return
-                }
+//                guard serviceData.count >= 16 else {
+//                    return
+//                }
                 
                 let tcn = Data(serviceData[0..<16])
                 self.tcnsForRemoteDeviceIdentifiers[peripheral.identifier] = tcn
@@ -881,16 +891,32 @@ extension TCNBluetoothServiceImpl: CBPeripheralDelegate {
                     let tcn = generateTCN()
                     let value = tcn
                     let muuid = UserDefaults.standard.value(forKey:"MUUID") as! String
-                    let data = [UInt8]("B\(muuid[muuid.index(muuid.startIndex, offsetBy: 0)])\(muuid[muuid.index(muuid.startIndex, offsetBy: 14)])\(muuid[muuid.index(muuid.startIndex, offsetBy: 35)])".utf8)
-                    var buffer = [UInt8](tcn)
-                    buffer.append(contentsOf:data)
-                    print("!!!!! \(Data(buffer))")
+////                    let value = tcn
+//                    let muuid_short = "B\(muuid[muuid.index(muuid.startIndex, offsetBy: 0)])\(muuid[muuid.index(muuid.startIndex, offsetBy: 14)])\(muuid[muuid.index(muuid.startIndex, offsetBy: 35)])"
+//                    tcn.append(muuid_short.data(using: String.Encoding.utf8)!)
+//                    let data = [UInt8]("B\(muuid[muuid.index(muuid.startIndex, offsetBy: 0)])\(muuid[muuid.index(muuid.startIndex, offsetBy: 14)])\(muuid[muuid.index(muuid.startIndex, offsetBy: 35)])".utf8)
+//                    var buffer = [UInt8](tcn)
+//                    buffer.append(contentsOf:data)
+//                    print("!!!!! \(Data(buffer))")
                                         
                     peripheral.writeValue(
                         value,
                         for: tcnCharacteristic,
                         type: .withResponse
                     )
+                    
+                    let nowTimestamp = NSDate().timeIntervalSince1970
+                    UIDevice.current.isBatteryMonitoringEnabled = true
+
+                    var txmuuid = UserDefaults.standard.value(forKey: "MUUID") as! String
+                    var txmuuid_short = "B\(txmuuid[txmuuid.index(txmuuid.startIndex, offsetBy: 0)])\(txmuuid[txmuuid.index(txmuuid.startIndex, offsetBy: 14)])\(txmuuid[txmuuid.index(txmuuid.startIndex, offsetBy: 35)])"
+                    
+                    var motion = true
+                    if (UserDefaults.standard.value(forKey: "Motion") as! Bool) == false{
+                        motion = false
+                    }
+                                        
+                    databaseManager.insertTXTCN(batteryLevel: Double(UIDevice.current.batteryLevel*100), gpsStatus: false, motionStatus: motion, ownTCN: UserDefaults.standard.value(forKey: "currentTCN") as! String, txMUUID: txmuuid, txMUUIDShort: txmuuid, txtcn: "\(UserDefaults.standard.value(forKey: "currentTCN") as! String)\(txmuuid)", unixTimestamp: Int(nowTimestamp))
 
                     if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
                         os_log(
@@ -1131,6 +1157,7 @@ extension TCNBluetoothServiceImpl: CBPeripheralManagerDelegate {
             // CBAdvertisementDataServiceDataKey : self.generateTCN()
         ]
         self.peripheralManager?.startAdvertising(advertisementData)
+        print("advertisementData:: \(advertisementData)")
         if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
             os_log(
                 "Peripheral manager starting advertising advertisementData=%@",
