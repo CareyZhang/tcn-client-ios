@@ -45,7 +45,7 @@ class TCNBluetoothServiceImpl: NSObject {
     
     private var connectingTimeoutTimersForPeripheralIdentifiers =
         [UUID : Timer]()
-    private var databaseManager = DBManager()
+    public var databaseManager = DBManager()
     
     private var connectingPeripheralIdentifiers = Set<UUID>() {
         didSet {
@@ -855,23 +855,41 @@ extension TCNBluetoothServiceImpl: CBPeripheralDelegate {
         didDiscoverCharacteristicsFor service: CBService,
         error: Error?
     ) {
+        print("sent tx tcn!")
         guard error == nil else {
             self.cancelConnectionIfNeeded(for: peripheral)
             return
         }
-        if UserDefaults.standard.value(forKey:"MUUID") == nil{
+        if UserDefaults.standard.value(forKey:"userID") == nil{
             return
-        } 
-        
+        }
+        if UserDefaults.standard.value(forKey:"token") == nil{
+            return
+        }
+        print("sent tx tcn!!")
         if let tcnCharacteristic = service.characteristics?.first(where: {
             $0.uuid == .tcnCharacteristic
         }) {
             // Read the number, if needed.
             if self.shouldReadTCN(from: peripheral) {
+                print("sent tx tcn!!!")
                 if !self.characteristicsBeingRead.contains(tcnCharacteristic) {
                     self.characteristicsBeingRead.insert(tcnCharacteristic)
                     
                     peripheral.readValue(for: tcnCharacteristic)
+                    let nowTimestamp = NSDate().timeIntervalSince1970
+                    UIDevice.current.isBatteryMonitoringEnabled = true
+
+                    var txmuuid = UserDefaults.standard.value(forKey: "MUUID") as! String
+                    var txmuuid_short = "B\(txmuuid[txmuuid.index(txmuuid.startIndex, offsetBy: 0)])\(txmuuid[txmuuid.index(txmuuid.startIndex, offsetBy: 14)])\(txmuuid[txmuuid.index(txmuuid.startIndex, offsetBy: 35)])"
+                    
+                    var motion = true
+                    if (UserDefaults.standard.value(forKey: "Motion") as! Bool) == false{
+                        motion = false
+                    }
+                    print("insert tx tcn")
+                    databaseManager.insertTXTCN(batteryLevel: Double(UIDevice.current.batteryLevel*100), gpsStatus: false, motionStatus: motion, ownTCN: UserDefaults.standard.value(forKey: "currentTCN") as! String, txMUUID: txmuuid, txMUUIDShort: txmuuid, txtcn: "\(UserDefaults.standard.value(forKey: "currentTCN") as! String)\(txmuuid)", unixTimestamp: Int(nowTimestamp))
+                    
                     if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
                         os_log(
                             "Peripheral (uuid=%@ name='%@') reading value for characteristic=%@ for service=%@",
@@ -885,6 +903,7 @@ extension TCNBluetoothServiceImpl: CBPeripheralDelegate {
                 }
             } // Write the number, if needed.
             else if self.shouldWriteTCN(to: peripheral) {
+                print("sent tx tcn!!!!")
                 if !self.characteristicsBeingWritten.contains(tcnCharacteristic) {
                     self.characteristicsBeingWritten.insert(tcnCharacteristic)
                     
@@ -915,9 +934,8 @@ extension TCNBluetoothServiceImpl: CBPeripheralDelegate {
                     if (UserDefaults.standard.value(forKey: "Motion") as! Bool) == false{
                         motion = false
                     }
-                                        
+                    print("insert tx tcn")
                     databaseManager.insertTXTCN(batteryLevel: Double(UIDevice.current.batteryLevel*100), gpsStatus: false, motionStatus: motion, ownTCN: UserDefaults.standard.value(forKey: "currentTCN") as! String, txMUUID: txmuuid, txMUUIDShort: txmuuid, txtcn: "\(UserDefaults.standard.value(forKey: "currentTCN") as! String)\(txmuuid)", unixTimestamp: Int(nowTimestamp))
-
                     if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
                         os_log(
                             "Peripheral (uuid=%@ name='%@') writing value for characteristic=%@ for service=%@",

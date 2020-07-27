@@ -39,7 +39,7 @@ public class DBManager: NSObject{
     public func insertRXTCN(closestEstimatedDistance: Double, rssi: Float, rxMUUIDShort: String, rxtcn: String, tcn: String, txMUUID: String, txMUUIDShort: String, unixTimestamp: Int){
         var insertsql = "INSERT INTO rx_tcn (closestEstimatedDistance, rssi, rxMUUIDShort, rxtcn, tcn, txMUUID, txMUUIDShort, unixTimestamp) VALUES (?,?,?,?,?,?,?,?);"
         var insertStatement:OpaquePointer? = nil
-        NSLog("insert Database Error Message : %s", sqlite3_errmsg(db));
+        //NSLog("insert Database Error Message : %s", sqlite3_errmsg(db));
         if sqlite3_prepare_v2(db, insertsql, -1, &insertStatement, nil) == SQLITE_OK {
             sqlite3_bind_double(insertStatement, 1, Double(closestEstimatedDistance))
             sqlite3_bind_double(insertStatement, 2, Double(rssi))
