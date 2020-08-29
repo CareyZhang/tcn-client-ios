@@ -16,13 +16,13 @@ public class DBManager: NSObject{
         if sqlite3_open(dbURL.path, &db) == SQLITE_OK {
             print("Successfully opened connection to database at \(dbURL.path)")
             
-            var createRXTableSQL = "create table if not exists rx_tcn(closestEstimatedDistance Double, rssi DOUBLE, rxMUUIDShort TEXT, rxtcn TEXT, tcn TEXT, txMUUID TEXT, txMUUIDShort TEXT, unixTimestamp INTEGER);"
+            var createRXTableSQL = "create table if not exists rx_tcn(closestEstimatedDistance DOUBLE, rssi DOUBLE, rxMUUIDShort TEXT, rxtcn TEXT, tcn TEXT, txMUUID TEXT, txMUUIDShort TEXT, latitude DOUBLE, longitude DOUBLE, power DOUBLE, unixTimestamp INTEGER);"
             if sqlite3_exec(db, createRXTableSQL, nil, nil, nil) != SQLITE_OK{
                 print("create table fail.")
                 return
             }
             
-            var createTXTableSQL = "create table if not exists tx_tcn(batteryLevel DOUBLE, gpsStatus INTEGER, motionStatus INTEGER, ownTCN TEXT, txMUUID TEXT, txMUUIDShort TEXT, txtcn TEXT, unixTimestamp INTEGER);"
+            var createTXTableSQL = "create table if not exists tx_tcn(batteryLevel DOUBLE, gpsStatus INTEGER, motionStatus INTEGER, ownTCN TEXT, txMUUID TEXT, txMUUIDShort TEXT, txtcn TEXT, latitude DOUBLE, longitude DOUBLE, unixTimestamp INTEGER);"
             
             if sqlite3_exec(db, createTXTableSQL, nil, nil, nil) != SQLITE_OK{
                 print("create RX table fail.")
@@ -36,8 +36,8 @@ public class DBManager: NSObject{
         }
     }
     
-    public func insertRXTCN(closestEstimatedDistance: Double, rssi: Float, rxMUUIDShort: String, rxtcn: String, tcn: String, txMUUID: String, txMUUIDShort: String, unixTimestamp: Int){
-        var insertsql = "INSERT INTO rx_tcn (closestEstimatedDistance, rssi, rxMUUIDShort, rxtcn, tcn, txMUUID, txMUUIDShort, unixTimestamp) VALUES (?,?,?,?,?,?,?,?);"
+    public func insertRXTCN(closestEstimatedDistance: Double, rssi: Float, rxMUUIDShort: String, rxtcn: String, tcn: String, txMUUID: String, txMUUIDShort: String, latitude: Double, longitude: Double, txPower: Double, unixTimestamp: Int){
+        var insertsql = "INSERT INTO rx_tcn (closestEstimatedDistance, rssi, rxMUUIDShort, rxtcn, tcn, txMUUID, txMUUIDShort, latitude, longitude, power, unixTimestamp) VALUES (?,?,?,?,?,?,?,?,?,?,?);"
         var insertStatement:OpaquePointer? = nil
         //NSLog("insert Database Error Message : %s", sqlite3_errmsg(db));
         if sqlite3_prepare_v2(db, insertsql, -1, &insertStatement, nil) == SQLITE_OK {
@@ -48,9 +48,13 @@ public class DBManager: NSObject{
             sqlite3_bind_text(insertStatement, 5, (tcn as NSString).utf8String, -1, nil)
             sqlite3_bind_text(insertStatement, 6, (txMUUID as NSString).utf8String, -1, nil)
             sqlite3_bind_text(insertStatement, 7, (txMUUIDShort as NSString).utf8String, -1, nil)
-            sqlite3_bind_int(insertStatement, 8, Int32(unixTimestamp))
+            sqlite3_bind_double(insertStatement, 8, Double(UserDefaults.standard.value(forKey: "Latitude") as! Double))
+            sqlite3_bind_double(insertStatement, 9, Double(UserDefaults.standard.value(forKey: "Longitude") as! Double))
+            sqlite3_bind_double(insertStatement, 10, Double(txPower) as! Double)
+            sqlite3_bind_int(insertStatement, 11, Int32(unixTimestamp))
             if sqlite3_step(insertStatement) == SQLITE_DONE {
                 print("Successfully insert row.")
+                print("insert rx tcn with location : \(txPower) \(UserDefaults.standard.value(forKey: "Latitude")) \(UserDefaults.standard.value(forKey: "Longitude"))")
             } else {
                 print("Could not insert row.")
             }
@@ -116,10 +120,13 @@ public class DBManager: NSObject{
                     let tcn = String(describing: String(cString:sqlite3_column_text(queryStatement, 4)))
                     let txMUUID = String(describing: String(cString: sqlite3_column_text(queryStatement, 5)))
                     let txMUUIDShort = String(describing: String(cString: sqlite3_column_text(queryStatement, 6)))
-                    let unixTimestamp = Int(sqlite3_column_int(queryStatement, 7))
+                    let latitude = sqlite3_column_double(queryStatement, 7)
+                    let longitude = sqlite3_column_double(queryStatement, 8)
+                    let power = sqlite3_column_double(queryStatement, 9)
+                    let unixTimestamp = Int(sqlite3_column_int(queryStatement, 10))
                     //var row = RX_TCN(closestEstimatedDistance: closestEstimatedDistance, rssi: rssi, rxMUUIDShort: rxMUUIDShort, rxtcn: rxtcn, tcn: tcn, txMUUID: txMUUID, txMUUIDShort: txMUUIDShort, unixTimestamp: unixTimestamp)
-                    print("sql get rx tcn: \(closestEstimatedDistance) \(rssi) \(rxMUUIDShort) \(rxtcn) \(tcn) \(txMUUID) \(txMUUIDShort) \(unixTimestamp)")
-                    RXTCNS.append(["ID":0,"RX_MUUID_SHORT": rxMUUIDShort,"TX_MUUID":txMUUID,"TX_MUUID_SHORT":txMUUIDShort,"RX_TCN":rxtcn,"TCN":tcn, "RSSI": rssi,"DISTANCE":Float(closestEstimatedDistance),"UNIX_TIMESTAMP":Int(unixTimestamp)])
+                    print("sql get rx tcn: \(closestEstimatedDistance) \(rssi) \(rxMUUIDShort) \(rxtcn) \(tcn) \(txMUUID) \(txMUUIDShort)  \(latitude) \(longitude) \(power) \(unixTimestamp)")
+                    RXTCNS.append(["ID":0,"RX_MUUID_SHORT": rxMUUIDShort,"TX_MUUID":txMUUID,"TX_MUUID_SHORT":txMUUIDShort,"RX_TCN":rxtcn,"TCN":tcn, "RSSI": rssi,"DISTANCE":Float(closestEstimatedDistance),"LATITUDE":latitude,"LONGITUDE":longitude,"YOUR_IOS_SEND_TX_POWER":power,"UNIX_TIMESTAMP":Int(unixTimestamp)])
                 }
             }
         }
@@ -155,7 +162,7 @@ public class DBManager: NSObject{
                     //var row = TX_TCN(batteryLevel: batteryLevel, gpsStatus: gpsStatus, motionStatus: motionStatus, ownTCN: ownTCN, txMUUID: txMUUID, txMUUIDShort: txMUUIDShort, txtcn: txtcn, unixTimestamp: unixTimestamp)
                     print("sql get tx tcn: \(batteryLevel) \(gpsStatus) \(motionStatus) \(ownTCN) \(txMUUID) \(txMUUIDShort) \(txtcn) \(unixTimestamp)")
                     
-                    TXTCNS.append(["ID":0,"TX_MUUID": txMUUID, "TX_MUUID_SHORT": txMUUIDShort, "TX_TCN": txtcn, "OWN_TCN": ownTCN, "BATTERY_LEVEL": batteryLevel, "MOTION_STATUS": motionStatus, "GPS_STATUS": gpsStatus, "UNIX_TIMESTAMP": unixTimestamp])
+                    TXTCNS.append(["ID":0,"TX_MUUID": txMUUID, "TX_MUUID_SHORT": txMUUIDShort, "TX_TCN": txtcn, "OWN_TCN": ownTCN, "BATTERY_LEVEL": batteryLevel, "MOTION_STATUS": motionStatus, "GPS_STATUS": gpsStatus, "ANDROID_TX_POWER_LEVEL": -1, "UNIX_TIMESTAMP": unixTimestamp])
                 }
             }
         }

@@ -7,7 +7,7 @@ import CoreBluetooth
 
 extension Double {
     
-    public static let measuredRSSIAtOneMeterDefault: Double = -57
+    public static let measuredRSSIAtOneMeterDefault: Double = -67
     
 }
 
@@ -23,13 +23,13 @@ func getMeasuredRSSIAtOneMeter(
     var txPowerLevel: Int! =
         (advertisementData[CBAdvertisementDataTxPowerLevelKey] as? NSNumber)?
             .intValue
-    
     if txPowerLevel == nil {
         // iOS 12 devices do not advertise the Tx power level.
         // Based on measurements, they seem to advertise at Tx power level 11.
         txPowerLevel = !hintIsAndroid ? 11 : 12
     }
     
+    print("isandroid:\(hintIsAndroid)")
     // Tx power levels are between -3 and 20. https://en.wikipedia.org/wiki/Bluetooth#Uses
     // Android clients report negative values, ones way below -3.
     // Based on measurements, they mean they are transmitting at
@@ -66,6 +66,7 @@ func getEstimatedDistanceMeters(
     RSSI: Double,
     measuredRSSIAtOneMeter: Double = .measuredRSSIAtOneMeterDefault,
     environmentalFactor: Double = 2) -> Double {
+    print("current rssi: \(RSSI)")
     
     // Ensure input is valid
     guard RSSI < 20 else {
@@ -74,6 +75,6 @@ func getEstimatedDistanceMeters(
     guard environmentalFactor >= 2 && environmentalFactor <= 4 else {
         return -1
     }
-    
+    print("current rssi and dist: \(pow(10, (measuredRSSIAtOneMeter - RSSI) / (10 * environmentalFactor))) \(RSSI)")
     return pow(10, (measuredRSSIAtOneMeter - RSSI) / (10 * environmentalFactor))
 }
